@@ -3,7 +3,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import Cookies from 'js-cookie';
 import { Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Bar, ComposedChart } from 'recharts';
-import { EyeClosed, EyeIcon } from 'lucide-react';
+import { Download, EyeClosed, EyeIcon } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 // --- SECURITY WARNING ---
 const CORRECT_PASSWORD = "cod_report!786**&&";
@@ -287,7 +288,7 @@ const CODBusinessModel: React.FC = () => {
     initialOrdersPerDay: 100,
     monthlyGrowthRate: 14,
     useFixedGrowthPattern: false,
-    avgOrderValue: 60,
+    avgOrderValue: 175,
     threePlPaymentDays: 3,
     premiumSettlementDays: 1,
     baseOpsStaffSalary: 2500,
@@ -682,6 +683,39 @@ const CODBusinessModel: React.FC = () => {
     projections[36]
   ].filter((p): p is ProjectionMonth => Boolean(p));
 
+  const handleExport = () => {
+    // Define headers for the Excel file
+    const headers = [
+      "Month", "Description", "Orders/Day", "Monthly Orders", "Partners", "Ops Staff", "Sales Staff",
+      "Total Staff", "Staff Needing Visas", "Visa-Applicable Staff", "Permit-Applicable Staff",
+      "Iqama-Applicable Staff", "Warehouse Cost", "Staff Salary", "Visa Costs", "Work Permit Costs",
+      "Iqama Costs", "Annual Renewals", "Other Costs", "Company Setup", "Total Costs",
+      "Standard COD Revenue", "Premium COD Revenue", "Warehousing Revenue", "Total Revenue",
+      "Monthly Profit", "COD Working Capital", "Daily Premium Settlement", "Cumulative Profit", "Cash Position"
+    ];
+
+    // Map the projection data to an array of arrays, starting with headers
+    const dataToExport = [
+      headers,
+      ...projections.map(p => [
+        p.month, p.description, p.ordersPerDay, p.monthlyOrders, p.partners, p.opsStaff, p.salesStaff,
+        p.totalStaff, p.staffRequiringVisas, p.staffApplicableForVisas, p.staffApplicableForWorkPermits,
+        p.staffApplicableForIqama, p.warehouseCost, p.staffSalary, p.visaCosts, p.workPermitCosts,
+        p.iqamaCosts, p.annualRenewalCosts, p.otherCosts, p.companySetupCosts, p.totalCosts,
+        p.standardRevenue, p.premiumRevenue, p.warehousingRevenue, p.totalRevenue, p.monthlyProfit,
+        p.codWorkingCapital, p.premiumCODSettlement, p.cumulativeProfit, p.cashPosition
+      ])
+    ];
+
+    // Create a new workbook and a worksheet
+    const ws = XLSX.utils.aoa_to_sheet(dataToExport);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Projections");
+
+    // Trigger the download
+    XLSX.writeFile(wb, "COD_Business_Model_Projections.xlsx");
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-2 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
@@ -915,7 +949,13 @@ const CODBusinessModel: React.FC = () => {
 
             {/* Key Milestones Table */}
             <div className="mt-8 bg-white rounded-2xl shadow-xl p-4 md:p-6">
-              <h3 className="text-xl md:text-2xl font-bold mb-6 text-gray-800">🎯 Key Milestones</h3>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl md:text-2xl font-bold text-gray-800">🎯 Key Milestones</h3>
+                {/* 3. Add the Export button */}
+                <button onClick={handleExport} className='bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-gray-900 transition cursor-pointer'>
+                  Export to Excel
+                </button>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -963,7 +1003,13 @@ const CODBusinessModel: React.FC = () => {
 
         {/* Complete Monthly Projections Table */}
         <div className="mt-8 bg-white rounded-2xl shadow-xl p-4 md:p-6">
-          <h3 className="text-xl md:text-2xl font-bold mb-6 text-gray-800">📊 Complete Monthly Projections (All 36 Months)</h3>
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="text-xl md:text-2xl font-bold text-gray-800">🎯 Key Milestones</h3>
+            {/* 3. Add the Export button */}
+            <button onClick={handleExport} className='bg-gray-800 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-gray-900 transition cursor-pointer'>
+              Export to Excel
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
