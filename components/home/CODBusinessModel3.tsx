@@ -193,7 +193,6 @@ interface ParametersState {
   warehouseExpansionCost: number;
   fullServiceExpansionMonth: number;
   fullServiceWarehouseCost: number;
-  // Re-adding the cost parameters with new, more realistic default values
   adminCostPerEmployee: number;
   adminCostBaseline: number;
   technologyCostPercentage: number;
@@ -245,7 +244,6 @@ interface ProjectionMonth {
   profitMargin: number;
   newOpsStaff: number;
   newSalesStaff: number;
-  // Re-adding the cost fields to the projection data
   adminCost: number;
   technologyCost: number;
   marketingCost: number;
@@ -293,11 +291,11 @@ const CODBusinessModel: React.FC = () => {
     iqamaRenewalApplicability: 3,
     misaAnnualRenewal: 62000,
     commercialRegistrationRenewal: 1200,
-    // Restoring the default values that led to a positive ROI before
-    standardCODRate: 5.0, 
-    premiumCODRate: 8.0,  
-    warehousingRate: 2.5, 
-    financeRate: 3.0,     
+    // ADJUSTED PARAMETERS FOR POSITIVE ROI
+    standardCODRate: 5.0, // Increased for better revenue
+    premiumCODRate: 8.0,  // Increased for better revenue
+    warehousingRate: 2.5, // Increased for better revenue
+    financeRate: 3.0,     // Increased for better revenue
     standardPercentage: 50,
     premiumPercentage: 50,
     warehousingPercentage: 40,
@@ -321,13 +319,12 @@ const CODBusinessModel: React.FC = () => {
     warehouseExpansionCost: 10000,
     fullServiceExpansionMonth: 25,
     fullServiceWarehouseCost: 15000,
-    // Restored cost parameters
-    adminCostPerEmployee: 1000,
-    adminCostBaseline: 5000,   
-    technologyCostPercentage: 2, 
-    technologyCostBaseline: 5000,
-    marketingCostPercentage: 2,  
-    marketingCostBaseline: 5000,
+    adminCostPerEmployee: 1000, // Reduced from 5000
+    adminCostBaseline: 5000,    // Reduced from 50000
+    technologyCostPercentage: 2,  // Reduced from 10
+    technologyCostBaseline: 5000, // Reduced from 20000
+    marketingCostPercentage: 2,   // Reduced from 5
+    marketingCostBaseline: 5000,  // Reduced from 20000
   });
 
   // Pre-defined growth pattern from Excel data
@@ -465,18 +462,15 @@ const CODBusinessModel: React.FC = () => {
       const partners = parameters.initialPartners;
       const totalStaff = opsStaff + salesStaff + partners;
       const nonSaudiPartners = partners - parameters.saudiPartners;
-      const nonPartnerStaff = opsStaff + salesStaff;
       const staffRequiringVisas = totalStaff - parameters.saudiPartners;
-      
-      const staffApplicableForVisas = calculateStaffForCost(parameters.visaCostApplicability, opsStaff, salesStaff, nonSaudiPartners);
-      const staffApplicableForWorkPermits = calculateStaffForCost(parameters.workPermitCostApplicability, opsStaff, salesStaff, nonSaudiPartners);
-      const staffApplicableForIqama = calculateStaffForCost(parameters.iqamaRenewalApplicability, opsStaff, salesStaff, nonSaudiPartners);
+      const nonPartnerStaff = opsStaff + salesStaff;
 
-      // Revenue calculations must happen BEFORE costs that depend on revenue
+      // Revenue calculations
       let standardRevenue = 0;
       let premiumRevenue = 0;
       let warehousingRevenue = 0;
       let financeRevenue = 0;
+
       if (month > 0) {
         const standardOrders = Math.round(monthlyOrders * parameters.standardPercentage / 100);
         const premiumOrders = Math.round(monthlyOrders * parameters.premiumPercentage / 100);
@@ -488,9 +482,26 @@ const CODBusinessModel: React.FC = () => {
         warehousingRevenue = warehousingOrders * parameters.warehousingRate;
         financeRevenue = financeOrders * parameters.financeRate;
       }
+
       const totalRevenue = standardRevenue + premiumRevenue + warehousingRevenue + financeRevenue;
 
-      // Cost calculations can now happen
+      // New Operational Cost Calculations
+      const adminTieredBaseline = nonPartnerStaff > 0 ? Math.ceil(nonPartnerStaff / ADMIN_COST_STAFF_THRESHOLD) * parameters.adminCostBaseline : 0;
+      const perEmployeeAdminCost = nonPartnerStaff * parameters.adminCostPerEmployee;
+      const adminCost = adminTieredBaseline + perEmployeeAdminCost;
+
+      const revenueBasedTechCost = totalRevenue * (parameters.technologyCostPercentage / 100);
+      const technologyCost = month > 0 ? Math.max(parameters.technologyCostBaseline, revenueBasedTechCost) : 0;
+
+      const revenueBasedMarketingCost = totalRevenue * (parameters.marketingCostPercentage / 100);
+      const marketingCost = month > 0 ? Math.max(parameters.marketingCostBaseline, revenueBasedMarketingCost) : 0;
+
+      // Staff affected by visa/permit costs
+      const staffApplicableForVisas = calculateStaffForCost(parameters.visaCostApplicability, opsStaff, salesStaff, nonSaudiPartners);
+      const staffApplicableForWorkPermits = calculateStaffForCost(parameters.workPermitCostApplicability, opsStaff, salesStaff, nonSaudiPartners);
+      const staffApplicableForIqama = calculateStaffForCost(parameters.iqamaRenewalApplicability, opsStaff, salesStaff, nonSaudiPartners);
+
+      // Cost calculations
       let warehouseCost = parameters.baseWarehouseCost;
       if (month >= parameters.fullServiceExpansionMonth) {
         warehouseCost = parameters.fullServiceWarehouseCost;
@@ -538,17 +549,6 @@ const CODBusinessModel: React.FC = () => {
         otherCosts = 5500;
       }
 
-      // Re-introducing operational cost calculations
-      const adminTieredBaseline = nonPartnerStaff > 0 ? Math.ceil(nonPartnerStaff / ADMIN_COST_STAFF_THRESHOLD) * parameters.adminCostBaseline : 0;
-      const perEmployeeAdminCost = nonPartnerStaff * parameters.adminCostPerEmployee;
-      const adminCost = adminTieredBaseline + perEmployeeAdminCost;
-
-      const revenueBasedTechCost = totalRevenue * (parameters.technologyCostPercentage / 100);
-      const technologyCost = month > 0 ? Math.max(parameters.technologyCostBaseline, revenueBasedTechCost) : 0;
-
-      const revenueBasedMarketingCost = totalRevenue * (parameters.marketingCostPercentage / 100);
-      const marketingCost = month > 0 ? Math.max(parameters.marketingCostBaseline, revenueBasedMarketingCost) : 0;
-
       const totalCosts = warehouseCost + staffSalary + adminCost + technologyCost + marketingCost + visaCosts + workPermitCosts + iqamaCosts + annualRenewalCosts + otherCosts + companySetupCosts;
 
       // COD Working Capital
@@ -572,8 +572,7 @@ const CODBusinessModel: React.FC = () => {
       }
 
       months.push({
-        month, description, ordersPerDay, monthlyOrders, opsStaff, salesStaff, partners, totalStaff,
-        staffRequiringVisas, // Fix: Explicitly defining the property
+        month, description, ordersPerDay, monthlyOrders, opsStaff, salesStaff, partners, totalStaff, staffRequiringVisas,
         staffApplicableForVisas, staffApplicableForWorkPermits, staffApplicableForIqama,
         warehouseCost: Math.round(warehouseCost),
         staffSalary: Math.round(staffSalary),
