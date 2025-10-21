@@ -166,20 +166,16 @@ interface ParametersState {
   iqamaRenewalApplicability: number;
   misaAnnualRenewal: number;
   commercialRegistrationRenewal: number;
-  // Restoring the default values that led to a positive ROI before
-  standardCODRate: number; 
-  premiumCODRate: number;  
-  warehousingRate: number; 
-  financeRate: number;     
+  standardCODRate: number;
+  premiumCODRate: number;
+  warehousingRate: number;
+  financeRate: number;
   standardPercentage: number;
   premiumPercentage: number;
   warehousingPercentage: number;
   financePercentage: number;
   initialOrdersPerDay: number;
-  // Replaced single monthlyGrowthRate with phased rates for better management
-  growthRateY1: number; // Months 1-12
-  growthRateY2: number; // Months 13-24
-  growthRateY3: number; // Months 25-36
+  monthlyGrowthRate: number;
   useFixedGrowthPattern: boolean;
   avgOrderValue: number;
   threePlPaymentDays: number;
@@ -307,10 +303,7 @@ const CODBusinessModel: React.FC = () => {
     warehousingPercentage: 40,
     financePercentage: 0,
     initialOrdersPerDay: 100,
-    // Phased growth rates, default 14% initially
-    growthRateY1: 14,
-    growthRateY2: 14,
-    growthRateY3: 14,
+    monthlyGrowthRate: 14,
     useFixedGrowthPattern: false,
     avgOrderValue: 175,
     threePlPaymentDays: 3,
@@ -358,13 +351,6 @@ const CODBusinessModel: React.FC = () => {
     { month: 36, ordersPerDay: 2775, description: "Final Scale" }
   ];
 
-  // Helper function to get growth rate for a specific month transition (to reach that month)
-  const getGrowthRateForMonth = (month: number): number => {
-    if (month <= 12) return parameters.growthRateY1;
-    if (month <= 24) return parameters.growthRateY2;
-    return parameters.growthRateY3;
-  };
-
   // Helper function to calculate staff affected by costs based on applicability
   const calculateStaffForCost = (applicability: number, opsStaff: number, salesStaff: number, nonSaudiPartners: number): number => {
     switch (applicability) {
@@ -388,7 +374,6 @@ const CODBusinessModel: React.FC = () => {
     let cashPosition = parameters.initialInvestment;
     let prevOpsStaff = 0;
     let prevSalesStaff = 0;
-    let currentOrders = 0; // Track previous orders for incremental growth
     const ADMIN_COST_STAFF_THRESHOLD = 10; // Hardcoded threshold
 
     for (let month = 0; month <= 36; month++) {
@@ -429,21 +414,15 @@ const CODBusinessModel: React.FC = () => {
           }
         }
       } else {
-        // Variable phased growth: incremental compounding
         if (month === 0) {
           ordersPerDay = 0;
           description = "Business Setup";
-          currentOrders = 0;
-        } else if (month === 1) {
-          ordersPerDay = parameters.initialOrdersPerDay;
-          description = "Operations Start";
-          currentOrders = ordersPerDay;
         } else {
-          const growthRate = getGrowthRateForMonth(month); // Rate applied to reach this month
-          ordersPerDay = Math.round(currentOrders * (1 + growthRate / 100));
-          currentOrders = ordersPerDay;
+          const growthFactor = Math.pow(1 + parameters.monthlyGrowthRate / 100, month - 1);
+          ordersPerDay = Math.round(parameters.initialOrdersPerDay * growthFactor);
 
-          if (month === 3) description = "Early Growth";
+          if (month === 1) description = "Operations Start";
+          else if (month === 3) description = "Early Growth";
           else if (month === 6) description = "Steady Growth";
           else if (month === 12) description = "Year 1 End";
           else if (month === 18) description = "Mid Growth";
@@ -713,7 +692,6 @@ const CODBusinessModel: React.FC = () => {
   const handleExport = () => {
     // We will use a pure JavaScript approach to generate a CSV file,
     // as external libraries like `xlsx` cannot be imported.
-    // Fixed: Use raw numbers without locale commas for CSV compatibility
     const headers = [
       "Month", "Description", "Orders/Day", "Monthly Orders", "Partners", "Ops Staff", "Sales Staff",
       "Total Staff",
@@ -732,7 +710,7 @@ const CODBusinessModel: React.FC = () => {
       p.iqamaCosts, p.annualRenewalCosts, p.otherCosts, p.companySetupCosts, p.totalCosts,
       p.standardRevenue, p.premiumRevenue, p.warehousingRevenue, p.financeRevenue, p.totalRevenue, p.monthlyProfit,
       p.codWorkingCapital, p.premiumCODSettlement, p.cumulativeProfit, p.cashPosition
-    ].map(val => typeof val === 'number' ? val.toString() : val)); // Ensure numbers are plain strings
+    ]);
 
     const csvContent = [
       headers.join(','), // Join headers with commas
@@ -836,30 +814,6 @@ const CODBusinessModel: React.FC = () => {
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Total Partners</label><input type="number" value={parameters.initialPartners} onChange={(e) => handleParameterChange('initialPartners', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" /></div>
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Saudi Partners (no visa needed)</label><input type="number" value={parameters.saudiPartners} onChange={(e) => handleParameterChange('saudiPartners', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" /></div>
                     <div><label className="block text-sm font-medium text-gray-700 mb-1">Partner Monthly Salary (SAR)</label><input type="number" value={parameters.basePartnerSalary} onChange={(e) => handleParameterChange('basePartnerSalary', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500" /></div>
-                  </div>
-                </div>
-                {/* New Growth Management Section */}
-                <div>
-                  <h3 className="text-lg font-semibold mb-3 text-green-600">📈 Growth Management</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-sm font-medium text-gray-700">Use Fixed Growth Pattern</label>
-                      <input 
-                        type="checkbox" 
-                        checked={parameters.useFixedGrowthPattern} 
-                        onChange={(e) => handleParameterChange('useFixedGrowthPattern', e.target.checked)}
-                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                      />
-                    </div>
-                    {!parameters.useFixedGrowthPattern && (
-                      <div className="space-y-3 pt-3 border-t border-gray-200">
-                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Initial Orders Per Day</label><input type="number" value={parameters.initialOrdersPerDay} onChange={(e) => handleParameterChange('initialOrdersPerDay', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" /></div>
-                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Year 1 Monthly Growth Rate (%)</label><input type="number" step="0.1" value={parameters.growthRateY1} onChange={(e) => handleParameterChange('growthRateY1', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" /></div>
-                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Year 2 Monthly Growth Rate (%)</label><input type="number" step="0.1" value={parameters.growthRateY2} onChange={(e) => handleParameterChange('growthRateY2', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" /></div>
-                        <div><label className="block text-sm font-medium text-gray-700 mb-1">Year 3 Monthly Growth Rate (%)</label><input type="number" step="0.1" value={parameters.growthRateY3} onChange={(e) => handleParameterChange('growthRateY3', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500" /></div>
-                        <p className="text-xs text-gray-500">Adjust rates to manage growth phases. Defaults to 14% initially.</p>
-                      </div>
-                    )}
                   </div>
                 </div>
                 <div>
